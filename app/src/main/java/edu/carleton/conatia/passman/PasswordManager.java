@@ -1,12 +1,19 @@
 
 import java.security.SecureRandom;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 
 import java.util.List;
 import java.util.ArrayList;
 
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+
 public class PasswordManager {
 
     public static final int ITERATIONS = 10000;
+    public static final int KEY_LENGTH = 512;
 
     public static class KeyHash {
         private byte[] hashedKey;
@@ -32,11 +39,25 @@ public class PasswordManager {
 
     public static KeyHash initialize(String master) {
         byte[] salt = new byte[8];
-        SecureRandom.getInstanceStrong().nextBytes(salt);
+        SecureRandom random = new SecureRandom();
+        random.nextBytes(salt);
         String saltString = new String(salt);
+        byte[] key = hashPassword(master, salt);
         
-        return new KeyHash(salt, saltString); //temporary
+        return new KeyHash(key, saltString); //temporary
 
+    }
+
+    public static byte[] hashPassword(String master, byte[] salt) {
+        char[] password = master.toCharArray();
+        try {
+            SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512");
+            PBEKeySpec spec = new PBEKeySpec(password, salt, ITERATIONS, KEY_LENGTH);
+            SecretKey key = factory.generateSecret(spec);
+            return key.getEncoded();
+        } catch(NoSuchAlgorithmException | InvalidKeySpecException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public static String decryptPassword(String master, String salt, String encrypted_password) {
@@ -49,6 +70,10 @@ public class PasswordManager {
 
     public static List<String> changeMaster(String oldMaster, String oldSalt, String newMaster, List<String> encryptedPasswords) {
         return encryptedPasswords;
+    }
+
+    public static void main(String[] args) {
+        initialize("password");
     }
 
 }
